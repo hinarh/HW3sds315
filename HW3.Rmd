@@ -1,0 +1,165 @@
+---
+title: "HW3"
+author: "Nihar Harkare"
+date: "2024-02-05"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+```
+
+# Problem 1
+
+## A
+
+```{r echo=FALSE}
+creatinine = read_csv("creatinine.csv", show_col_types = FALSE)
+
+model = lm(creatclear ~ age, data = creatinine)
+intercept = coef(model)[1]
+slope = coef(model)[2]
+predicted_clearance = intercept + slope * 55
+```
+
+For a 55-year-old, we should expect a clearance rate of `r predicted_clearance`. I found this using the linear model function, and finding the slope and the y intercept of the function, and substituting an age of 55 into it, so that predicted_clearance = intercept + slope * 55.
+
+## B
+
+```{r echo=FALSE}
+model = lm(creatclear ~ age, data = creatinine)
+slope = coef(model)[2]
+```
+
+As age increases, clearance rate changes by `r slope`, meaning a fall of `r -slope` in clearance for every increase by 1 in age. I found this by creating a linear regression model, and finding the slope of it.
+
+## C
+
+```{r echo=FALSE}
+predicted_40 = intercept + slope * 40
+predicted_60 = intercept + slope * 60
+
+residual_40 = 135 - predicted_40
+residual_60 = 112 - predicted_60
+```
+
+The 40 year old has a healthier creatinine clearance for their age because the residual between their actual and predicted creatinine clearance is `r residual_40` while it's `r residual_60` for the 60 year old. I found this by plugging in 40 and 60 into the linear regression model to calculate the predicted residual, which looked like predicted_residual = intercept + slope * (age). I then subtracted that from their actual creatinine clearance, which looked like residual = (actual creatinine clearance) - predicted_40, and this gave me the residuals for the two individuals.
+
+# Problem 2
+
+```{r echo=FALSE}
+markets = read_csv("marketmodel.csv", show_col_types = FALSE)
+
+regression_results = tibble(
+  Ticker = character(),
+  Intercept = numeric(),
+  Slope = numeric(),
+  R2 = numeric()
+)
+
+for (stock in c("AAPL", "GOOG", "MRK", "JNJ", "WMT", "TGT")) {
+  markets_subset = select(markets, Date, all_of(stock))
+  market_return = rowMeans(select(markets, -c("Date", all_of(stock))), na.rm = TRUE)
+  regression_data = data.frame(markets_subset, Market_Return = market_return)
+  regression_data = na.omit(regression_data)
+  
+  regression_model = lm(paste(stock, "~ Market_Return"), data = regression_data)
+  intercept = coef(regression_model)[1]
+  slope = coef(regression_model)[2]
+  r_squared = summary(regression_model)$r.squared
+  
+  regression_results = bind_rows(regression_results, tibble(Ticker = stock, Intercept = intercept, Slope = slope, R2 = r_squared))
+}
+
+```
+
+## What is Beta?
+
+The beta of a stock essentially measures the reactivity of the stock to the current market conditions. If the beta is greater than 1, it is very reactive to market conditions. If it is less than 1 and greater than 0, it is not very reactive to market conditions. If the beta is 0, then the stock isn't reactive at all to the market conditions. Finally, if the beta is less than 0, the stock is inversely reactive to the market conditions. Beta is related to the regression table by being equivalent to the slope value. So, when you perform a regression analysis for each stock against the market return, the beta value for each stock indicates how much the stock's returns tend to move with the overall market. In summary, the beta value in the regression table quantifies the stock's risk and its relationship to the market.
+
+
+## Table
+
+```{r echo=FALSE}
+library(knitr)
+
+table_data = as.data.frame(regression_results)
+
+formatted_table = kable(table_data, caption = "Regression Results for Each Stock")
+
+print(formatted_table)
+```
+This is a table of regression results for each stock, and contains the ticker, the intercept, or the return of the asset when the market is 0, the slope, which is the beta value for that market and represents the volatility of the stock to changes in the market, and the r-squared, which represents the proportion of the variability that can be explained by the market returns.
+
+## Conclusion
+
+Using my analysis, I can determine that the stock with the lowest systematic risk (smallest Beta) is `r regression_results[which.min(regression_results$Slope), 1]`. The stock with the highest systematic risk is `r regression_results[which.max(regression_results$Slope), 1]`.
+
+# Problem 3
+
+```{r echo=FALSE}
+covid = read_csv("covid.csv", show_col_types = FALSE)
+
+italy_data = subset(covid, country == "Italy")
+italy_data = na.omit(italy_data)
+
+exp_growth_model = nls(deaths ~ a * exp(b * days_since_first_death), data = italy_data, start = list(a = max(italy_data$deaths), b = 0.1))
+
+a_coefficient = coef(exp_growth_model)[1]
+b_coefficient = coef(exp_growth_model)[2]
+
+italy_growth_rate = b_coefficient
+italy_doubling_time = log(2) / italy_growth_rate
+```
+
+The growth rate and doubling time for Italy are `r round(italy_growth_rate, 3)` and `r round(italy_doubling_time)` respectively.
+
+```{r echo=FALSE}
+spain_data = subset(covid, country == "Spain")
+spain_data = na.omit(spain_data)
+
+exp_growth_model = nls(deaths ~ a * exp(b * days_since_first_death), data = spain_data, start = list(a = max(spain_data$deaths), b = 0.1))
+
+a_coefficient = coef(exp_growth_model)[1]
+b_coefficient = coef(exp_growth_model)[2]
+
+spain_growth_rate = b_coefficient
+spain_doubling_time = log(2) / spain_growth_rate
+```
+
+The growth rate and doubling time for Spain are `r round(spain_growth_rate, 3)` and `r round(spain_doubling_time)` respectively.
+
+```{r echo=FALSE}
+daily_deaths_data = covid %>%
+  select(country, days_since_first_death, deaths)
+
+ggplot(daily_deaths_data, aes(x = days_since_first_death, y = deaths, color = country)) +
+  geom_line() +
+  labs(title = "Reported Daily Deaths Over Time", x = "Days Since First Death", y = "Daily Deaths", color = "Country")
+```
+
+# Problem 4
+
+```{r echo=FALSE}
+milk = read_csv("milk.csv", show_col_types = FALSE)
+
+milk$log_sales = log(milk$sales)
+milk$log_price = log(milk$price)
+
+linear_model = lm(log_sales ~ log_price, data = milk)
+
+slope = coef(linear_model)[2]
+
+price_elasticity = slope
+```
+
+The price elasticity of the demand is `r round(price_elasticity, 4)`, meaning that the market is very reactive to changes in the milk's price. To find this, I created two new variables in the milk dataset which were the log of sales and price. I then put the data into a linear model. Finally, I found the slope, which was the price elasticity.
